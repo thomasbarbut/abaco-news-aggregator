@@ -101,6 +101,47 @@ async def auth_callback(
     )
 
 
+@router.post("/admin-login", response_model=TokenResponse)
+async def admin_login(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Local-dev fallback. POST {"username":"admin","password":"admin"}
+    returns a JWT for an admin user. Disabled in non-debug builds."""
+    from app.core.config import settings
+    if not settings.DEBUG:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    if body.get("username") != "admin" or body.get("password") != "admin":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    email = "admin@local.dev"
+    stmt = select(User).where(User.email == email)
+    user = (await db.execute(stmt)).scalar_one_or_none()
+    if user is None:
+        user = User(
+            email=email,
+            name="admin",
+            role=UserRole.admin,
+            microsoft_id="dev-local-admin",
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        logger.info(f"admin-login created admin user id={user.id}")
+
+    access_token = create_access_token(
+        subject=str(user.id),
+        extra_claims={"role": user.role.value, "email": user.email},
+    )
+    refresh = create_refresh_token(subject=str(user.id))
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh,
+        token_type="bearer",
+        expires_in=3600,
+    )
+
+
 @router.post("/refresh")
 async def refresh_token(
     body: RefreshRequest,
