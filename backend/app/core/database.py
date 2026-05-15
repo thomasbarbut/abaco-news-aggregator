@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -22,15 +22,25 @@ def _build_async_url(url: str) -> str:
 
 
 _async_url = _build_async_url(settings.DATABASE_URL)
+_is_sqlite = _async_url.startswith("sqlite")
 
-engine = create_async_engine(
-    _async_url,
-    echo=settings.DEBUG,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-)
+if _is_sqlite:
+    from sqlalchemy.pool import StaticPool
+    engine = create_async_engine(
+        _async_url,
+        echo=settings.DEBUG,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+else:
+    engine = create_async_engine(
+        _async_url,
+        echo=settings.DEBUG,
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+    )
 
 # ---------------------------------------------------------------------------
 # Session factory
@@ -75,6 +85,27 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 # ---------------------------------------------------------------------------
 
 
+def _create_tables_sqlite(sync_conn: Any) -> None:
+    """Create all tables on SQLite, skipping PostgreSQL-specific GIN indexes."""
+    from app.models.article import Article
+
+    # The GIN full-text search index uses to_tsvector() which SQLite doesn't have.
+    # Temporarily remove it so create_all succeeds, then restore for prod parity.
+    table = Article.__table__  # type: ignore[attr-defined]
+    table_indexes = table.indexes  # type: ignore[attr-defined]
+    fts_index = next(
+        (idx for idx in table_indexes if idx.name == "ix_articles_fts"),
+        None,
+    )
+    if fts_index:
+        table_indexes.discard(fts_index)
+    try:
+        Base.metadata.create_all(sync_conn, checkfirst=True)  # type: ignore[arg-type]
+    finally:
+        if fts_index:
+            table_indexes.add(fts_index)
+
+
 async def init_db() -> None:
     """Create all tables that are registered on Base.metadata.
 
@@ -85,4 +116,7 @@ async def init_db() -> None:
     import app.models  # noqa: F401
 
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        if _is_sqlite:
+            await conn.run_sync(_create_tables_sqlite)
+        else:
+            await conn.run_sync(Base.metadata.create_all)

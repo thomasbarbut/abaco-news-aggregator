@@ -3,9 +3,19 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import AsyncGenerator
+
+# Set required env vars before any app module is imported.
+# app.core.config instantiates Settings() at module level; without these,
+# pydantic-settings raises ValidationError on import.
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("JWT_SECRET", "test_secret_for_pytest_not_for_production")
+os.environ.setdefault("MICROSOFT_CLIENT_ID", "test-client-id")
+os.environ.setdefault("MICROSOFT_CLIENT_SECRET", "test-client-secret")
+os.environ.setdefault("MICROSOFT_TENANT_ID", "test-tenant-id")
 
 import pytest
 import pytest_asyncio
@@ -37,19 +47,37 @@ def event_loop_policy():
 
 # We set asyncio_mode = auto in pytest.ini; these session-scoped async fixtures
 # share the same loop via the session-wide event loop created by pytest-asyncio.
+def _create_tables_sqlite(sync_conn: object) -> None:
+    """Create tables for SQLite, skipping the PostgreSQL GIN FTS index."""
+    fts_index = next(
+        (idx for idx in Article.__table__.indexes if idx.name == "ix_articles_fts"),
+        None,
+    )
+    if fts_index:
+        Article.__table__.indexes.discard(fts_index)
+    try:
+        Base.metadata.create_all(sync_conn, checkfirst=True)  # type: ignore[arg-type]
+    finally:
+        if fts_index:
+            Article.__table__.indexes.add(fts_index)
+
+
 @pytest_asyncio.fixture(scope="session")
 async def async_engine():
     """Create the async SQLite engine and all tables once per session."""
+    from sqlalchemy.pool import StaticPool
+
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
         connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     # Import all models so they register on Base.metadata
     import app.models  # noqa: F401
 
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_create_tables_sqlite)
 
     yield engine
 

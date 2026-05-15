@@ -47,6 +47,8 @@ node_modules/
 frontend/dist/
 frontend/.vite/
 *.local
+# Re-include frontend source lib (overrides the `lib/` Python rule above)
+!frontend/src/lib/
 
 # Playwright browsers cache
 .playwright/

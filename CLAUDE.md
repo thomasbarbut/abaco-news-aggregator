@@ -28,6 +28,14 @@ docker compose exec backend alembic upgrade head
 docker compose exec backend python -m app.scripts.seed_sources
 ```
 
+After `docker compose up -d`, the local dev URLs are:
+- `http://localhost:8080` — full app (frontend + API via nginx proxy)
+- `http://localhost:8000/docs` — FastAPI Swagger UI
+
+For frontend hot-reload development, run `npm run dev` in `frontend/` while the
+backend is running on port 8000. Vite serves on `http://localhost:5173` and
+proxies `/api/*` to `http://localhost:8000`.
+
 ## Project Structure
 
 ```
@@ -94,7 +102,7 @@ cd frontend
 # Install dependencies
 npm install
 
-# Start dev server (proxies /api to backend:8000)
+# Start dev server on :5173 (proxies /api to localhost:8000 — backend must be running)
 npm run dev
 
 # Type check
