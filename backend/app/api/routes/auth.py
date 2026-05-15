@@ -124,6 +124,43 @@ async def auth_callback(
     )
 
 
+@router.post("/dev-login", summary="LOCAL DEV ONLY — auto-login as admin", response_model=TokenResponse)
+async def dev_login(db: AsyncSession = Depends(get_db)) -> TokenResponse:
+    """Bypass Entra ID for local dev. Returns a JWT for a user named 'admin'.
+
+    Only works when DEBUG=true. In production this returns 404 so the endpoint
+    effectively doesn't exist."""
+    if not settings.DEBUG:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    from app.models.user import UserRole
+
+    email = "admin@local.dev"
+    stmt = select(User).where(User.email == email)
+    user = (await db.execute(stmt)).scalar_one_or_none()
+    if user is None:
+        user = User(
+            email=email,
+            name="admin",
+            role=UserRole.admin,
+            microsoft_id="dev-local-admin",  # not real, just needed to satisfy NOT NULL/UNIQUE
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        logger.info(f"Dev-login created admin user id={user.id}")
+
+    access_token, refresh_token = create_token_pair(
+        subject=user.id,
+        extra_claims={"role": user.role.value, "email": user.email},
+    )
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
 @router.post("/refresh", summary="Refresh access token", response_model=TokenResponse)
 async def refresh_token(
     body: RefreshRequest,
