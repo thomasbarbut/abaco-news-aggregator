@@ -23,14 +23,19 @@ def _build_async_url(url: str) -> str:
 
 _async_url = _build_async_url(settings.DATABASE_URL)
 
-engine = create_async_engine(
-    _async_url,
-    echo=settings.DEBUG,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-)
+# SQLite uses NullPool and rejects pool_size/max_overflow. Postgres uses
+# QueuePool and needs them. Branch on the URL.
+_is_sqlite = _async_url.startswith("sqlite")
+_engine_kwargs: dict = {"echo": settings.DEBUG}
+if not _is_sqlite:
+    _engine_kwargs.update(
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+    )
+
+engine = create_async_engine(_async_url, **_engine_kwargs)
 
 # ---------------------------------------------------------------------------
 # Session factory
