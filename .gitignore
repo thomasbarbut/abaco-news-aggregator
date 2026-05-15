@@ -78,3 +78,8 @@ Thumbs.db
 # Temporary
 tmp/
 temp/
+
+# Local dev (native, no Docker)
+backend/dev.db
+backend/dev.db-shm
+backend/dev.db-wal

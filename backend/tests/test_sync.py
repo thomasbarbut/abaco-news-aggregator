@@ -218,7 +218,7 @@ async def test_trigger_sync_all(
     mock_task = MagicMock()
     mock_task.id = "fake-celery-task-id"
 
-    with patch("app.api.admin.sync_all_sources") as mock_sync:
+    with patch("app.tasks.sync_tasks.sync_all_sources") as mock_sync:
         mock_sync.delay.return_value = mock_task
         response = await client.post(
             "/api/admin/sync",
@@ -240,7 +240,7 @@ async def test_trigger_sync_single_source(
     mock_task = MagicMock()
     mock_task.id = "fake-celery-task-id-single"
 
-    with patch("app.api.admin.sync_single_source") as mock_sync:
+    with patch("app.tasks.sync_tasks.sync_single_source") as mock_sync:
         mock_sync.delay.return_value = mock_task
         response = await client.post(
             "/api/admin/sync",

@@ -40,16 +40,21 @@ def event_loop_policy():
 @pytest_asyncio.fixture(scope="session")
 async def async_engine():
     """Create the async SQLite engine and all tables once per session."""
+    from sqlalchemy.pool import StaticPool
+
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
         connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     # Import all models so they register on Base.metadata
     import app.models  # noqa: F401
 
+    from app.core.database import _create_tables_sqlite
+
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_create_tables_sqlite)
 
     yield engine
 
