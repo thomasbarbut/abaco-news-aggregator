@@ -110,7 +110,7 @@ export default function App() {
         <Route path="article/:id" element={<ArticlePage />} />
       </Route>
 
-      {/* Protected admin */}
+      {/* Protected admin — AdminPage reads the tab from URL pathname */}
       <Route
         path="/admin"
         element={
@@ -121,7 +121,10 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<AdminPage />} />
+        <Route index          element={<AdminPage />} />
+        <Route path="sources" element={<AdminPage />} />
+        <Route path="logs"    element={<AdminPage />} />
+        <Route path="users"   element={<AdminPage />} />
       </Route>
 
       {/* Fallback */}

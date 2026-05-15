@@ -34,9 +34,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # In development we create tables directly; in production Alembic handles this
         await init_db()
 
+    # Background auto-sync loop. Runs in-process when no Celery worker/beat is
+    # available (eager mode). When CELERY_TASK_ALWAYS_EAGER=true (or DEBUG=true)
+    # we use this loop; otherwise assume Celery beat is running elsewhere and
+    # skip the in-process loop.
+    import asyncio as _asyncio
+    import os as _os
+    auto_sync_task = None
+    _eager = _os.environ.get("CELERY_TASK_ALWAYS_EAGER", "").lower() in ("1", "true", "yes")
+    if _eager or settings.DEBUG:
+        from app.api.admin import auto_sync_loop
+        auto_sync_task = _asyncio.create_task(auto_sync_loop())
+        logger.info("In-process auto-sync loop started (eager mode)")
+
     yield
 
     # Shutdown
+    if auto_sync_task is not None:
+        auto_sync_task.cancel()
     logger.info("Shutting down ABACO News backend")
 
 

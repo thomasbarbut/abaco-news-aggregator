@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import apiClient from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { ro } from 'date-fns/locale';
@@ -249,8 +251,51 @@ function LogsTab() {
 
 // ── Users tab ─────────────────────────────────────────────────────────────
 function UsersTab() {
-  const { data: users = [], isLoading } = useAdminUsers();
+  const { data: users = [], isLoading, refetch } = useAdminUsers();
   const { mutate: updateRole, isPending } = useUpdateUserRole();
+
+  // Entra ID search + invite
+  const [entraQuery, setEntraQuery] = useState('');
+  const [entraResults, setEntraResults] = useState<any[]>([]);
+  const [entraConfigured, setEntraConfigured] = useState<boolean | null>(null);
+  const [entraMsg, setEntraMsg] = useState<string>('');
+  const [searching, setSearching] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null);
+
+  const searchEntra = async () => {
+    setSearching(true);
+    try {
+      const { data } = await apiClient.get('/admin/users/entra/search', {
+        params: { q: entraQuery, top: 20 },
+      });
+      setEntraConfigured(data.configured);
+      setEntraResults(data.users || []);
+      setEntraMsg(data.message || '');
+    } catch (e: any) {
+      setEntraMsg(`Eroare: ${e?.message || 'unknown'}`);
+      setEntraResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const addFromEntra = async (u: any) => {
+    setAdding(u.id);
+    try {
+      await apiClient.post('/admin/users', {
+        microsoft_id: u.id,
+        email: u.mail || u.userPrincipalName,
+        name: u.displayName,
+        role: 'user',
+      });
+      refetch();
+      setEntraResults((prev) => prev.filter((x) => x.id !== u.id));
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || 'Adăugarea a eșuat');
+    } finally {
+      setAdding(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -263,7 +308,66 @@ function UsersTab() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-6">
+      {/* ── Entra search + invite ── */}
+      <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+        <h3 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-3">
+          Adaugă utilizatori din Microsoft Entra ID
+        </h3>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="text"
+            value={entraQuery}
+            onChange={(e) => setEntraQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') searchEntra(); }}
+            placeholder="Caută după nume sau email (lasă gol pentru primii 20)"
+            className="flex-1 h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+          />
+          <button
+            onClick={searchEntra}
+            disabled={searching}
+            className="h-10 px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold disabled:opacity-50"
+          >
+            {searching ? 'Caut…' : 'Caută'}
+          </button>
+        </div>
+
+        {entraConfigured === false && (
+          <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 whitespace-pre-wrap">
+            {entraMsg}
+          </div>
+        )}
+
+        {entraResults.length > 0 && (
+          <div className="divide-y divide-gray-100 dark:divide-gray-800 border border-gray-100 dark:border-gray-800 rounded-lg mt-2">
+            {entraResults.map((u) => (
+              <div key={u.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-gray-800 dark:text-gray-200 truncate">{u.displayName}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {u.mail || u.userPrincipalName}{u.jobTitle ? ` · ${u.jobTitle}` : ''}
+                  </div>
+                </div>
+                <button
+                  onClick={() => addFromEntra(u)}
+                  disabled={adding === u.id}
+                  className="h-8 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold disabled:opacity-50"
+                >
+                  {adding === u.id ? 'Adaug…' : 'Adaugă'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {entraConfigured === true && entraResults.length === 0 && !searching && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Nicio potrivire. Încearcă alt termen sau lasă gol.
+          </div>
+        )}
+      </div>
+
+      {/* ── Local users table ── */}
       <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
         <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
           <thead>
@@ -316,7 +420,69 @@ function UsersTab() {
 
 // ── AdminPage ─────────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  // Derive active tab from URL pathname so the sidebar NavLinks work.
+  // (Previously activeTab was useState-only and clicking the sidebar links
+  //  in AdminLayout only changed the URL, leaving the tab unchanged.)
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tabFromPath: Tab =
+    location.pathname.endsWith('/sources') ? 'sources' :
+    location.pathname.endsWith('/logs')    ? 'logs' :
+    location.pathname.endsWith('/users')   ? 'users' :
+    'dashboard';
+  const activeTab = tabFromPath;
+  const setActiveTab = (t: Tab) => {
+    const path = t === 'dashboard' ? '/admin' : `/admin/${t}`;
+    navigate(path);
+  };
+
+  // Poll sync status every 2s so the user sees "Sync în curs..." live
+  const [syncStatus, setSyncStatus] = useState<{
+    in_progress: boolean; started_at: number | null; source_id: string | null;
+    last_finished_at: number | null; last_result: any;
+  } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const { data } = await apiClient.get('/admin/sync/status');
+        if (alive) setSyncStatus(data);
+      } catch {}
+    };
+    tick();
+    const id = setInterval(tick, 2000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  // Auto-sync config (interval + enabled)
+  const [syncCfg, setSyncCfg] = useState<{interval_minutes: number; enabled: boolean} | null>(null);
+  const [editIntv, setEditIntv] = useState<string>('');
+  const [savingCfg, setSavingCfg] = useState(false);
+  const loadCfg = async () => {
+    try {
+      const { data } = await apiClient.get('/admin/sync/config');
+      setSyncCfg(data);
+      setEditIntv(String(data.interval_minutes));
+    } catch {}
+  };
+  useEffect(() => { loadCfg(); }, []);
+  const saveCfg = async (patch: {interval_minutes?: number; enabled?: boolean}) => {
+    setSavingCfg(true);
+    try {
+      const { data } = await apiClient.patch('/admin/sync/config', patch);
+      setSyncCfg(data);
+      setEditIntv(String(data.interval_minutes));
+    } catch (e) {
+      console.warn('saveCfg failed', e);
+    } finally {
+      setSavingCfg(false);
+    }
+  };
+
+  const elapsedSec =
+    syncStatus?.in_progress && syncStatus.started_at
+      ? Math.round((Date.now() / 1000) - syncStatus.started_at)
+      : 0;
 
   return (
     <div>
@@ -328,6 +494,69 @@ export default function AdminPage() {
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           Monitorizare, configurare și management al platformei ABACO News
         </p>
+
+        {/* Live sync-in-progress banner */}
+        {syncStatus?.in_progress && (
+          <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800">
+            <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-brand-700 dark:text-brand-300">
+                Sincronizare în curs ({elapsedSec}s)
+              </div>
+              <div className="text-xs text-brand-600 dark:text-brand-400">
+                {syncStatus.source_id ? `Sursa: ${syncStatus.source_id.slice(0,8)}…` : 'Toate sursele active'}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Auto-sync configuration */}
+        {syncCfg && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={syncCfg.enabled}
+                  disabled={savingCfg}
+                  onChange={(e) => saveCfg({ enabled: e.target.checked })}
+                />
+                <div className="w-9 h-5 bg-gray-300 dark:bg-gray-600 peer-checked:bg-brand-500 rounded-full transition-colors peer-disabled:opacity-50">
+                  <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform ${syncCfg.enabled ? 'translate-x-4' : 'translate-x-0.5'} mt-0.5`} />
+                </div>
+              </label>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Sincronizare automată
+              </span>
+            </div>
+            <span className="text-gray-300 dark:text-gray-600">|</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">la fiecare</span>
+            <input
+              type="number"
+              min={1}
+              max={1440}
+              value={editIntv}
+              disabled={savingCfg || !syncCfg.enabled}
+              onChange={(e) => setEditIntv(e.target.value)}
+              className="w-16 h-8 px-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm text-center"
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">minute</span>
+            <button
+              type="button"
+              disabled={savingCfg || !syncCfg.enabled || Number(editIntv) === syncCfg.interval_minutes}
+              onClick={() => saveCfg({ interval_minutes: Number(editIntv) })}
+              className="h-8 px-3 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Salvează
+            </button>
+            {syncStatus?.last_finished_at && (
+              <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                Ultima rulare: acum {Math.round((Date.now()/1000) - syncStatus.last_finished_at)}s
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tab navigation */}

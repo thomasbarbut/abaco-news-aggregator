@@ -160,12 +160,11 @@ def _get_scraper_for_source(source: NewsSource):  # noqa: ANN201
     from app.scrapers.registry import SCRAPER_REGISTRY
     from app.models.news_source import SourceType
 
-    # Try the registry first (keyed by source.name)
-    scraper_cls = SCRAPER_REGISTRY.get(source.name)
-    if scraper_cls is not None:
-        return scraper_cls()
-
-    # Generic fallback based on source_type
+    # If the source has been configured with source_type=rss AND an rss_url,
+    # honor that even when a custom (Playwright-based) scraper exists in the
+    # registry. Operators may switch a source from Playwright to RSS when the
+    # custom scraper's selectors are broken or when a real feed becomes
+    # available.
     if source.source_type == SourceType.rss and source.rss_url:
         class _GenericRSS(RSSBaseScraper):
             source_name = source.name
@@ -173,6 +172,11 @@ def _get_scraper_for_source(source: NewsSource):  # noqa: ANN201
             rss_url = source.rss_url  # type: ignore[assignment]
 
         return _GenericRSS()
+
+    # Try the registry next (keyed by source.name)
+    scraper_cls = SCRAPER_REGISTRY.get(source.name)
+    if scraper_cls is not None:
+        return scraper_cls()
 
     if source.source_type == SourceType.playwright:
         class _GenericPlaywright(PlaywrightBaseScraper):

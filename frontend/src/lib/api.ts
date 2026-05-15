@@ -44,43 +44,22 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
+    // On 401: token is invalid/expired. Clear it and bounce to /login.
+    // We don't auto-refresh because the backend's /auth/refresh needs a
+    // refresh_token in the body and the frontend doesn't store one.
+    // Also clear the Zustand persisted auth state — otherwise LoginPage's
+    // useEffect sees isAuthenticated=true (from persisted localStorage) and
+    // navigates back to '/' immediately, causing an infinite loop.
     if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        // Queue the request until token is refreshed
-        return new Promise((resolve) => {
-          subscribeTokenRefresh((token: string) => {
-            if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-            }
-            resolve(apiClient(originalRequest));
-          });
-        });
-      }
-
       originalRequest._retry = true;
-      isRefreshing = true;
-
+      clearStoredToken();
       try {
-        const { data } = await apiClient.post<{ access_token: string; token_type: string; expires_in: number }>(
-          '/auth/refresh',
-        );
-        const newToken = data.access_token;
-        setStoredToken(newToken);
-        onRefreshComplete(newToken);
-        isRefreshing = false;
-
-        if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        }
-        return apiClient(originalRequest);
-      } catch {
-        isRefreshing = false;
-        refreshSubscribers = [];
-        clearStoredToken();
-        // Redirect to login
+        localStorage.removeItem('abaco-auth');  // Zustand persist key
+      } catch {}
+      if (window.location.pathname !== '/login') {
         window.location.href = '/login';
-        return Promise.reject(error);
       }
+      return Promise.reject(error);
     }
 
     return Promise.reject(error);
