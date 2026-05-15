@@ -131,48 +131,54 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
           </div>
         )}
 
-        {/* Author + actions row */}
+        {/* Author + actions row.
+            "Original" stays on the left (next to author), "Marchează citit"
+            is a larger, distinctly-styled button on the FAR right with a clear
+            gap so they aren't fat-finger-adjacent on mobile. */}
         <div className="mt-2 flex items-center gap-2">
           {article.author && (
             <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[180px]">
               {article.author}
             </span>
           )}
-          <div className="ml-auto flex items-center gap-1">
-            {!article.is_read && (
-              <button
-                type="button"
-                onClick={handleMarkRead}
-                className={cn(
-                  'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium',
-                  'text-gray-500 dark:text-gray-400',
-                  'hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400',
-                  'transition-colors',
-                )}
-                title="Marchează ca citit"
-                aria-label="Marchează ca citit"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Citit</span>
-              </button>
+
+          <a
+            href={article.original_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleOriginalClick}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium',
+              'text-gray-500 dark:text-gray-400',
+              'hover:bg-accent-50 hover:text-accent-600 dark:hover:bg-accent-900/20 dark:hover:text-accent-400',
+              'transition-colors',
             )}
-            <a
-              href={article.original_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleOriginalClick}
+            title="Deschide articolul în tab nou"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Original</span>
+          </a>
+
+          {!article.is_read && (
+            <button
+              type="button"
+              onClick={handleMarkRead}
               className={cn(
-                'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium',
-                'text-gray-500 dark:text-gray-400',
-                'hover:bg-accent-50 hover:text-accent-600 dark:hover:bg-accent-900/20 dark:hover:text-accent-400',
-                'transition-colors',
+                'ml-auto flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold',
+                'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800',
+                'hover:bg-emerald-100 hover:border-emerald-300',
+                'dark:hover:bg-emerald-900/30 dark:hover:border-emerald-700',
+                'active:scale-95 transition-all',
+                'shrink-0',
               )}
-              title="Deschide articolul în tab nou"
+              title="Marchează ca citit"
+              aria-label="Marchează ca citit"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Original</span>
-            </a>
-          </div>
+              <Check className="w-4 h-4" strokeWidth={2.5} />
+              <span>Marchează citit</span>
+            </button>
+          )}
         </div>
       </div>
 
