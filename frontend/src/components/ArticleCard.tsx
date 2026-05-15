@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { ro } from 'date-fns/locale';
-import { ExternalLink, BookOpen } from 'lucide-react';
+import { ExternalLink, BookOpen, Check } from 'lucide-react';
 import type { Article } from '@/types';
 import SourceBadge from './SourceBadge';
+import { useMarkRead } from '@/api/articles';
 import { cn } from '@/lib/utils';
 
 interface ArticleCardProps {
@@ -31,19 +31,33 @@ function RelativeTime({ dateStr }: { dateStr: string }) {
 }
 
 export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
-  const navigate = useNavigate();
+  const { mutate: markRead } = useMarkRead();
 
+  // Click anywhere on the card: open the source article in a new tab AND
+  // mark it as read locally. We skip the in-app /article/:id detail view —
+  // user feedback showed they always wanted to read on the source site.
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      e.preventDefault();
-      navigate(`/article/${article.id}`);
+      // Don't double-trigger when the user clicked a nested link/button
+      if ((e.target as HTMLElement).closest('a, button')) return;
+      window.open(article.original_url, '_blank', 'noopener,noreferrer');
+      if (!article.is_read) markRead(article.id);
     },
-    [navigate, article.id],
+    [article.id, article.original_url, article.is_read, markRead],
   );
 
-  const handleOriginalClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-  }, []);
+  const handleMarkRead = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!article.is_read) markRead(article.id);
+    },
+    [article.id, article.is_read, markRead],
+  );
+
+  // Nested <a> needs to also mark as read but should not be intercepted
+  const handleOriginalClick = useCallback(() => {
+    if (!article.is_read) markRead(article.id);
+  }, [article.id, article.is_read, markRead]);
 
   return (
     <motion.article
@@ -117,27 +131,48 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
           </div>
         )}
 
-        {/* Author & external link */}
-        <div className="mt-2 flex items-center justify-between">
+        {/* Author + actions row */}
+        <div className="mt-2 flex items-center gap-2">
           {article.author && (
             <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[180px]">
               {article.author}
             </span>
           )}
-          <a
-            href={article.original_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleOriginalClick}
-            className={cn(
-              'ml-auto flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500',
-              'hover:text-accent-500 dark:hover:text-accent-400 transition-colors',
-              'opacity-0 group-hover:opacity-100',
+          <div className="ml-auto flex items-center gap-1">
+            {!article.is_read && (
+              <button
+                type="button"
+                onClick={handleMarkRead}
+                className={cn(
+                  'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium',
+                  'text-gray-500 dark:text-gray-400',
+                  'hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400',
+                  'transition-colors',
+                )}
+                title="Marchează ca citit"
+                aria-label="Marchează ca citit"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Citit</span>
+              </button>
             )}
-          >
-            <ExternalLink className="w-3 h-3" />
-            Original
-          </a>
+            <a
+              href={article.original_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleOriginalClick}
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium',
+                'text-gray-500 dark:text-gray-400',
+                'hover:bg-accent-50 hover:text-accent-600 dark:hover:bg-accent-900/20 dark:hover:text-accent-400',
+                'transition-colors',
+              )}
+              title="Deschide articolul în tab nou"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Original</span>
+            </a>
+          </div>
         </div>
       </div>
 

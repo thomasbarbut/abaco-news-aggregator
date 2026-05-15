@@ -17,13 +17,14 @@ interface FeedState {
 const DEFAULT_FILTERS: ArticleFilter = {
   page: 1,
   page_size: 20,
+  is_read: false,  // Default: only show unread articles
 };
 
 export const useFeedStore = create<FeedState>()(
   persist(
     (set) => ({
       filters: DEFAULT_FILTERS,
-      hideRead: false,
+      hideRead: true,  // Default: hide read articles
       sidebarOpen: true,
       darkMode: false,
 
