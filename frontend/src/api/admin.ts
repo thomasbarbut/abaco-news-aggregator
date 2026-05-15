@@ -64,10 +64,13 @@ export function useAdminUsers() {
 // ── Trigger sync (all or specific source) ────────────────────────────────
 export function useTriggerSync() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (sourceId?: string) => {
-      const url = sourceId ? `/admin/sync?source_id=${sourceId}` : '/admin/sync';
-      const { data } = await apiClient.post<{ message: string }>(url);
+  return useMutation<{ message: string }, Error, string | undefined>({
+    mutationFn: async (sourceId) => {
+      // Backend expects JSON body {source_id: string|null}
+      const { data } = await apiClient.post<{ message: string }>(
+        '/admin/sync',
+        { source_id: sourceId ?? null },
+      );
       return data;
     },
     onSuccess: () => {
