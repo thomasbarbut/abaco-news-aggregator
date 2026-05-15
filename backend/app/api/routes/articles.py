@@ -1,11 +1,10 @@
 """Articles endpoints."""
 
-import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -15,7 +14,7 @@ from app.models.article import Article
 from app.models.article_read import ArticleRead
 from app.models.news_source import NewsSource
 from app.models.user import User
-from app.schemas.article import ArticleFilter, ArticleListResponse, ArticleResponse
+from app.schemas.article import ArticleListResponse, ArticleResponse
 from app.schemas.source import NewsSourceResponse
 
 router = APIRouter()

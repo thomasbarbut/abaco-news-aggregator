@@ -1,6 +1,5 @@
 """Authentication routes – Microsoft Entra ID (MSAL) OAuth2/OIDC flow."""
 
-import urllib.parse
 from datetime import datetime, timezone
 
 import msal
@@ -13,7 +12,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.logging import get_logger
 from app.core.security import (
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
     create_token_pair,
     verify_refresh_token,
 )
@@ -120,7 +119,7 @@ async def auth_callback(
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        expires_in=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
 
@@ -146,5 +145,5 @@ async def refresh_token(
     return TokenResponse(
         access_token=access_token,
         refresh_token=new_refresh_token,
-        expires_in=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )

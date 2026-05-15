@@ -1,9 +1,9 @@
 """Seed initial news sources into the database."""
 import asyncio
-from app.core.database import async_session_maker
+from app.core.database import AsyncSessionLocal as async_session_maker
 from app.models.news_source import NewsSource, SourceType, SyncStatus
 
-SOURCES = [
+SOURCES: list[dict] = [
     {
         "name": "ZF - Ziarul Financiar",
         "url": "https://www.zf.ro",

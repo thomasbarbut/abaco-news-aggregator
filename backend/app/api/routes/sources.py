@@ -3,13 +3,14 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_admin
 from app.core.database import get_db
 from app.core.logging import get_logger
-from app.models.news_source import NewsSource, SourceType, SyncStatus
+from app.models.news_source import NewsSource, SourceType
 from app.models.user import User
 from app.schemas.source import NewsSourceResponse
 
@@ -45,14 +46,6 @@ async def get_source(
 # ---------------------------------------------------------------------------
 # Admin-only mutations
 # ---------------------------------------------------------------------------
-
-
-class _SourceCreate(NewsSourceResponse.__class__.__bases__[0]):  # type: ignore[misc]
-    """Internal schema – we reuse it rather than importing from schemas."""
-    pass
-
-
-from pydantic import BaseModel
 
 
 class SourceCreate(BaseModel):

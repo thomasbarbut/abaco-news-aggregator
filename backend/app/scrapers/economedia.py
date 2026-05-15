@@ -3,7 +3,6 @@ from typing import Any
 from playwright.async_api import Page
 from .playwright_base import PlaywrightBaseScraper
 import logging
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +82,9 @@ class EconomiediaScraper(PlaywrightBaseScraper):
 
             # Try each card selector until we find cards
             card_elements = []
-            used_selector = None
             for selector in self._CARD_SELECTORS:
                 card_elements = await page.query_selector_all(selector)
                 if len(card_elements) >= 5:
-                    used_selector = selector
                     logger.debug(
                         f"Economedia: found {len(card_elements)} cards with '{selector}'"
                     )
@@ -201,7 +198,7 @@ class EconomiediaScraper(PlaywrightBaseScraper):
 
     async def _fallback_link_extraction(self, page: Page) -> list[dict[str, Any]]:
         """Last-resort: extract article links from all anchors on the page."""
-        articles = []
+        articles: list[dict] = []
         anchors = await page.query_selector_all("a[href]")
         seen_urls: set[str] = set()
 

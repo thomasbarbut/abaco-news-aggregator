@@ -27,4 +27,4 @@ def get_scraper(source_name: str):
     cls = SCRAPER_REGISTRY.get(source_name)
     if cls is None:
         raise ValueError(f"No scraper registered for: {source_name}")
-    return cls()
+    return cls()  # type: ignore[abstract]

@@ -34,7 +34,7 @@ async def get_current_user(
 
     try:
         payload = verify_access_token(credentials.credentials)
-        user_id_str: str = payload.get("sub")
+        user_id_str: str | None = payload.get("sub")
         if not user_id_str:
             raise credentials_exception
         user_id = UUID(user_id_str)

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import textwrap
-from datetime import datetime
 
 from app.core.config import settings
 from app.core.logging import get_logger

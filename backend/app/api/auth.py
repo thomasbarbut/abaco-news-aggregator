@@ -109,7 +109,7 @@ async def refresh_token(
     """Issue a new access token using a valid refresh token."""
     try:
         payload = verify_refresh_token(body.refresh_token)
-        user_id: str = payload.get("sub")
+        user_id: str | None = payload.get("sub")
         if not user_id:
             raise ValueError("Missing subject in refresh token")
     except Exception:

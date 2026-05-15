@@ -163,7 +163,7 @@ def _get_scraper_for_source(source: NewsSource):  # noqa: ANN201
     # Try the registry first (keyed by source.name)
     scraper_cls = SCRAPER_REGISTRY.get(source.name)
     if scraper_cls is not None:
-        return scraper_cls()
+        return scraper_cls()  # type: ignore[abstract]
 
     # Generic fallback based on source_type
     if source.source_type == SourceType.rss and source.rss_url:

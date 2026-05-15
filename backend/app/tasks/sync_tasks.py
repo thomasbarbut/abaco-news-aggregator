@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import traceback
 from datetime import datetime, timezone
 
 from app.core.logging import get_logger
@@ -67,7 +66,6 @@ def sync_single_source(self, source_id: str) -> dict:
 
 
 async def _sync_all_async() -> dict:
-    import uuid as _uuid
     from sqlalchemy import select
     from app.core.database import AsyncSessionLocal
     from app.models.news_source import NewsSource

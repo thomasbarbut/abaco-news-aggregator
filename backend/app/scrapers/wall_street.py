@@ -224,7 +224,7 @@ class WallStreetScraper(PlaywrightBaseScraper):
         }
 
     async def _fallback_link_extraction(self, page: Page) -> list[dict[str, Any]]:
-        articles = []
+        articles: list[dict] = []
         anchors = await page.query_selector_all("a[href]")
         seen_urls: set[str] = set()
 

@@ -1,5 +1,5 @@
+from typing import Any
 from playwright.async_api import async_playwright, Page
-from datetime import datetime, timezone
 from .base import BaseScraper
 import logging
 
@@ -20,7 +20,7 @@ class PlaywrightBaseScraper(BaseScraper):
         "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
 
-    async def fetch(self) -> list[Page]:
+    async def fetch(self) -> list[dict[str, Any]]:
         """Returns list of article dicts scraped with Playwright."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(args=self.browser_args, headless=True)

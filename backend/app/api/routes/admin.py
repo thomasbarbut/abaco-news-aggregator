@@ -4,16 +4,16 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import require_admin
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.logging import get_logger
 from app.models.article import Article
-from app.models.news_source import NewsSource, SyncStatus
+from app.models.news_source import NewsSource
 from app.models.sync_log import SyncLog, SyncLogStatus
 from app.models.user import User
 from app.schemas.sync import AdminStatsResponse, SyncLogResponse, SyncRequest
