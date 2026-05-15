@@ -1,5 +1,5 @@
 from typing import Any
-from playwright.async_api import async_playwright, Page
+from playwright.async_api import async_playwright
 from .base import BaseScraper
 import logging
 
