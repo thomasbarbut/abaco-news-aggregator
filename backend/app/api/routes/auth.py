@@ -124,6 +124,41 @@ async def auth_callback(
     )
 
 
+@router.post("/admin-login", summary="LOCAL DEV ONLY — username/password admin login", response_model=TokenResponse)
+async def admin_login(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Local-dev fallback: accepts {username: 'admin', password: 'admin'} and
+    returns a JWT for an admin user. Disabled in production."""
+    if not settings.DEBUG:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    if body.get("username") != "admin" or body.get("password") != "admin":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    from app.models.user import UserRole
+    email = "admin@local.dev"
+    stmt = select(User).where(User.email == email)
+    user = (await db.execute(stmt)).scalar_one_or_none()
+    if user is None:
+        user = User(
+            email=email, name="admin", role=UserRole.admin,
+            microsoft_id="dev-local-admin",
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    access_token, refresh_token = create_token_pair(
+        subject=user.id,
+        extra_claims={"role": user.role.value, "email": user.email},
+    )
+    return TokenResponse(
+        access_token=access_token, refresh_token=refresh_token,
+        expires_in=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
 @router.post("/dev-login", summary="LOCAL DEV ONLY — auto-login as admin", response_model=TokenResponse)
 async def dev_login(db: AsyncSession = Depends(get_db)) -> TokenResponse:
     """Bypass Entra ID for local dev. Returns a JWT for a user named 'admin'.

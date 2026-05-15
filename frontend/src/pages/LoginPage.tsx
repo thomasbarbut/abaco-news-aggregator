@@ -89,6 +89,29 @@ export default function LoginPage() {
     }
   }, []);
 
+  // ── Local-dev admin/admin login ─────────────────────────────────────────
+  const [adminUser, setAdminUser] = useState('admin');
+  const [adminPass, setAdminPass] = useState('admin');
+  const handleAdminLogin = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data } = await apiClient.post<{ access_token: string }>(
+        '/auth/admin-login',
+        { username: adminUser, password: adminPass },
+      );
+      setToken(data.access_token);
+      setStoredToken(data.access_token);
+      const { data: me } = await apiClient.get<User>('/auth/me');
+      setUser(me);
+      navigate('/', { replace: true });
+    } catch {
+      setError('Login admin a eșuat (folosește admin / admin în dev).');
+      setIsLoading(false);
+    }
+  }, [adminUser, adminPass, navigate, setToken, setUser]);
+
   return (
     <div className="min-h-screen flex">
       {/* ── Left panel: branding ────────────────────────────────────── */}
@@ -209,6 +232,43 @@ export default function LoginPage() {
               {error}
             </motion.div>
           )}
+
+          {/* Local-dev admin login form */}
+          <form onSubmit={handleAdminLogin} className="mb-6 space-y-3">
+            <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
+              Dev login (admin / admin)
+            </div>
+            <input
+              type="text"
+              value={adminUser}
+              onChange={(e) => setAdminUser(e.target.value)}
+              placeholder="username"
+              className="w-full h-11 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <input
+              type="password"
+              value={adminPass}
+              onChange={(e) => setAdminPass(e.target.value)}
+              placeholder="password"
+              className="w-full h-11 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-11 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-sm transition-colors disabled:opacity-60"
+            >
+              {isLoading ? 'Se autentifică…' : 'Login as admin'}
+            </button>
+          </form>
+
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="px-3 bg-surface-light dark:bg-surface-dark text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">sau</span>
+            </div>
+          </div>
 
           {/* Sign in button */}
           <button
