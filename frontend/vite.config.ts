@@ -12,7 +12,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        // Configurable: local dev (no Docker) sets VITE_PROXY_TARGET to a
+        // localhost URL. Docker compose uses the default "backend" service name.
+        target: process.env.VITE_PROXY_TARGET || 'http://backend:8000',
         changeOrigin: true,
       },
     },
