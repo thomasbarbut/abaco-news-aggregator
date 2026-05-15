@@ -487,11 +487,11 @@ export default function AdminPage() {
   return (
     <div>
       {/* Page header */}
-      <div className="px-6 pt-6 pb-4">
-        <h1 className="font-serif text-2xl font-bold text-gray-900 dark:text-white">
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4">
+        <h1 className="font-serif text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
           Panou de administrare
         </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
           Monitorizare, configurare și management al platformei ABACO News
         </p>
 
@@ -559,9 +559,9 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* Tab navigation */}
-      <div className="px-6 border-b border-gray-100 dark:border-gray-800">
-        <div className="flex gap-1">
+      {/* Tab navigation — scrolls horizontally on mobile if needed */}
+      <div className="px-4 sm:px-6 border-b border-gray-100 dark:border-gray-800 overflow-x-auto">
+        <div className="flex gap-1 min-w-max">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
