@@ -15,7 +15,9 @@ pytestmark = pytest.mark.asyncio
 
 async def test_login_returns_auth_url(client: AsyncClient) -> None:
     """GET /api/auth/login should return a Microsoft auth URL and a state token."""
-    response = await client.get("/api/auth/login")
+    fake_url = "https://login.microsoftonline.com/tenant/oauth2/v2.0/authorize?client_id=x&state=y"
+    with patch("app.api.auth.get_auth_url", return_value=fake_url):
+        response = await client.get("/api/auth/login")
     assert response.status_code == 200
     data = response.json()
     assert "auth_url" in data

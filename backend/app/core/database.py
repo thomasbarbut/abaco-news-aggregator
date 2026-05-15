@@ -91,17 +91,18 @@ def _create_tables_sqlite(sync_conn: object) -> None:
 
     # The GIN full-text search index uses to_tsvector() which SQLite doesn't have.
     # Temporarily remove it so create_all succeeds, then restore for prod parity.
+    table = Article.__table__  # type: ignore[attr-defined]
     fts_index = next(
-        (idx for idx in Article.__table__.indexes if idx.name == "ix_articles_fts"),
+        (idx for idx in table.indexes if idx.name == "ix_articles_fts"),
         None,
     )
     if fts_index:
-        Article.__table__.indexes.discard(fts_index)
+        table.indexes.discard(fts_index)
     try:
         Base.metadata.create_all(sync_conn, checkfirst=True)  # type: ignore[arg-type]
     finally:
         if fts_index:
-            Article.__table__.indexes.add(fts_index)
+            table.indexes.add(fts_index)
 
 
 async def init_db() -> None:
