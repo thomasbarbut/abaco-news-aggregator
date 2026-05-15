@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { user, isAdmin, logout: storeLogout } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { darkMode, toggleDarkMode, sidebarOpen, setSidebarOpen, filters, setFilters } = useFeedStore();
   const { mutate: logoutMutation } = useLogout();
   const { logout } = useAuthStore();

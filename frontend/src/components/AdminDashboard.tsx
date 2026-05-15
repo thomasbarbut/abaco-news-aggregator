@@ -202,7 +202,7 @@ export default function AdminDashboard() {
             </p>
           )}
           <button
-            onClick={() => triggerSync()}
+            onClick={() => triggerSync(undefined)}
             disabled={isSyncing}
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all',
