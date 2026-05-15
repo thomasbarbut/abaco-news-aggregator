@@ -14,16 +14,30 @@ interface FeedState {
   toggleDarkMode: () => void;
 }
 
-const DEFAULT_FILTERS: ArticleFilter = {
-  page: 1,
-  page_size: 20,
-  is_read: false,  // Default: only show unread articles
-};
+// Today as YYYY-MM-DD in the user's local timezone.
+function todayLocalDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Computed lazily on each store init so "today" is actually today,
+// not the date the bundle was built.
+function defaultFilters(): ArticleFilter {
+  return {
+    page: 1,
+    page_size: 20,
+    is_read: false,        // hide read articles
+    date_from: todayLocalDate(),  // only today by default
+  };
+}
 
 export const useFeedStore = create<FeedState>()(
   persist(
     (set) => ({
-      filters: DEFAULT_FILTERS,
+      filters: defaultFilters(),
       hideRead: true,  // Default: hide read articles
       sidebarOpen: true,
       darkMode: false,
@@ -34,7 +48,7 @@ export const useFeedStore = create<FeedState>()(
         })),
 
       resetFilters: () =>
-        set({ filters: DEFAULT_FILTERS }),
+        set({ filters: defaultFilters() }),
 
       setHideRead: (hideRead) =>
         set((state) => ({

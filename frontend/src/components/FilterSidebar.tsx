@@ -127,6 +127,49 @@ export default function FilterSidebar({ onClose }: FilterSidebarProps) {
           <p className="text-2xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2 px-1">
             Interval dată
           </p>
+
+          {/* Quick presets */}
+          <div className="grid grid-cols-2 gap-1.5 mb-3">
+            {(() => {
+              const today = new Date();
+              const fmt = (d: Date) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+              };
+              const todayStr = fmt(today);
+              const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+              const yesterdayStr = fmt(yesterday);
+              const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+              const weekStr = fmt(weekAgo);
+
+              const presets = [
+                { label: 'Astăzi',     from: todayStr,     to: undefined  },
+                { label: 'Ieri',       from: yesterdayStr, to: yesterdayStr },
+                { label: '7 zile',     from: weekStr,      to: undefined  },
+                { label: 'Toate',      from: undefined,    to: undefined  },
+              ];
+              const active = (p: typeof presets[number]) =>
+                (filters.date_from ?? undefined) === p.from && (filters.date_to ?? undefined) === p.to;
+              return presets.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => setFilters({ date_from: p.from, date_to: p.to })}
+                  className={cn(
+                    'h-7 rounded-md text-xs font-medium transition-colors',
+                    active(p)
+                      ? 'bg-brand-500 text-white shadow-sm'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700',
+                  )}
+                >
+                  {p.label}
+                </button>
+              ));
+            })()}
+          </div>
+
           <div className="flex flex-col gap-2">
             <div>
               <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">De la</label>
