@@ -59,10 +59,17 @@ export default function FeedPage() {
   }
 
   // Tabs: All news | Newsletters. Driven by filters.category.
+  // Newsletter tab also drops the date filter — newsletters land weekly,
+  // not daily, so the default "yesterday onwards" filter would hide most.
   const { setFilters } = useFeedStore();
-  const tabs: { id: string; label: string; category: string | undefined }[] = [
-    { id: 'news',       label: 'Știri',       category: undefined  },
-    { id: 'newsletter', label: 'Newsletter',  category: 'newsletter' },
+  const todayLocal = (() => {
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  })();
+  const tabs: { id: string; label: string; onClick: () => void }[] = [
+    { id: 'news',       label: 'Știri',       onClick: () => setFilters({ category: undefined, date_from: todayLocal }) },
+    { id: 'newsletter', label: 'Newsletter',  onClick: () => setFilters({ category: 'newsletter', date_from: undefined, date_to: undefined }) },
   ];
   const activeTabId = filters.category === 'newsletter' ? 'newsletter' : 'news';
 
@@ -74,7 +81,7 @@ export default function FeedPage() {
           <button
             key={t.id}
             type="button"
-            onClick={() => setFilters({ category: t.category })}
+            onClick={t.onClick}
             className={
               'h-9 px-4 rounded-t-lg text-sm font-semibold transition-colors border-b-2 -mb-px ' +
               (activeTabId === t.id
