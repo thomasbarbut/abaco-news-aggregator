@@ -6,25 +6,10 @@ import apiClient, { setStoredToken } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import type { User } from '@/types';
 
-interface MicrosoftIconProps {
-  className?: string;
-}
-
-function MicrosoftIcon({ className }: MicrosoftIconProps) {
-  return (
-    <svg className={className} viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="1" y="1" width="9" height="9" fill="#F25022" />
-      <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
-      <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
-      <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
-    </svg>
-  );
-}
-
 const features = [
   { icon: Zap,    label: 'Actualizare în timp real',  desc: 'Știri sincronizate automat din surse de top' },
   { icon: Globe,  label: 'Surse verificate',           desc: 'Business, juridic și startup din România' },
-  { icon: Shield, label: 'Acces securizat',             desc: 'Autentificare prin Microsoft Entra ID' },
+  { icon: Shield, label: 'Acces securizat',             desc: 'Autentificare cu utilizator și parolă' },
 ];
 
 export default function LoginPage() {
@@ -75,30 +60,16 @@ export default function LoginPage() {
     })();
   }, [location.search, isExchanging, setToken, setUser, navigate]);
 
-  const handleLogin = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data } = await apiClient.get<{ auth_url: string; state: string }>('/auth/login');
-      // Save state for CSRF protection
-      sessionStorage.setItem('oauth_state', data.state);
-      window.location.href = data.auth_url;
-    } catch {
-      setError('Nu s-a putut iniția autentificarea. Verifică conexiunea la internet.');
-      setIsLoading(false);
-    }
-  }, []);
-
-  // ── Local-dev admin/admin login ─────────────────────────────────────────
-  const [adminUser, setAdminUser] = useState('admin');
-  const [adminPass, setAdminPass] = useState('admin');
+  // Username / parolă state
+  const [adminUser, setAdminUser] = useState('');
+  const [adminPass, setAdminPass] = useState('');
   const handleAdminLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     try {
       const { data } = await apiClient.post<{ access_token: string }>(
-        '/auth/admin-login',
+        '/auth/login',
         { username: adminUser, password: adminPass },
       );
       setToken(data.access_token);
@@ -107,7 +78,7 @@ export default function LoginPage() {
       setUser(me);
       navigate('/', { replace: true });
     } catch {
-      setError('Login admin a eșuat (folosește admin / admin în dev).');
+      setError('Utilizator sau parolă greșite.');
       setIsLoading(false);
     }
   }, [adminUser, adminPass, navigate, setToken, setUser]);
@@ -219,7 +190,7 @@ export default function LoginPage() {
             Bun venit
           </h2>
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-8">
-            Autentifică-te cu contul tău Microsoft pentru a accesa platforma.
+            Introdu utilizatorul și parola pentru a accesa platforma.
           </p>
 
           {/* Error */}
@@ -233,83 +204,32 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          {/* Local-dev admin login form */}
-          <form onSubmit={handleAdminLogin} className="mb-6 space-y-3">
-            <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
-              Dev login (admin / admin)
-            </div>
+          <form onSubmit={handleAdminLogin} className="space-y-3">
             <input
               type="text"
+              autoComplete="username"
+              autoFocus
               value={adminUser}
               onChange={(e) => setAdminUser(e.target.value)}
-              placeholder="username"
-              className="w-full h-11 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="Utilizator"
+              className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
             <input
               type="password"
+              autoComplete="current-password"
               value={adminPass}
               onChange={(e) => setAdminPass(e.target.value)}
-              placeholder="password"
-              className="w-full h-11 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="Parolă"
+              className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-sm transition-colors disabled:opacity-60"
+              className="w-full h-12 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-sm transition-colors disabled:opacity-60"
             >
-              {isLoading ? 'Se autentifică…' : 'Login as admin'}
+              {isLoading ? 'Se autentifică…' : 'Conectare'}
             </button>
           </form>
-
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200 dark:border-gray-700" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="px-3 bg-surface-light dark:bg-surface-dark text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">sau</span>
-            </div>
-          </div>
-
-          {/* Sign in button */}
-          <button
-            onClick={handleLogin}
-            disabled={isLoading}
-            className={`
-              w-full flex items-center justify-center gap-3 h-12 rounded-xl
-              bg-white dark:bg-gray-800
-              border border-gray-200 dark:border-gray-700
-              text-gray-800 dark:text-white font-semibold text-sm
-              shadow-sm hover:shadow-md
-              hover:border-brand-300 dark:hover:border-brand-600
-              transition-all duration-200
-              disabled:opacity-60 disabled:cursor-not-allowed
-              focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2
-            `}
-          >
-            {isLoading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-                <span>Se autentifică…</span>
-              </>
-            ) : (
-              <>
-                <MicrosoftIcon className="w-5 h-5" />
-                <span>Continuă cu Microsoft</span>
-              </>
-            )}
-          </button>
-
-          <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
-            Prin autentificare, accepți{' '}
-            <a href="#" className="underline hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-              Termenii și Condițiile
-            </a>{' '}
-            și{' '}
-            <a href="#" className="underline hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-              Politica de confidențialitate
-            </a>
-            .
-          </p>
         </motion.div>
       </div>
     </div>

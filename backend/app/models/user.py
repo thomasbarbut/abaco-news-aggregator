@@ -22,11 +22,23 @@ class User(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    microsoft_id: Mapped[str] = mapped_column(
+    # microsoft_id stays for legacy users (kept for migration safety); new
+    # users use username + password_hash for username/password login.
+    microsoft_id: Mapped[str | None] = mapped_column(
         String(255),
         unique=True,
-        nullable=False,
+        nullable=True,
         index=True,
+    )
+    username: Mapped[str | None] = mapped_column(
+        String(64),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+    password_hash: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
     )
     email: Mapped[str] = mapped_column(
         String(320),

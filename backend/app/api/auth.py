@@ -2,8 +2,9 @@ import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.database import get_db
 from app.core.security import create_access_token, create_refresh_token, verify_refresh_token
@@ -101,33 +102,39 @@ async def auth_callback(
     )
 
 
+class _LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 @router.post("/admin-login", response_model=TokenResponse)
-async def admin_login(
-    body: dict,
+@router.post("/login", response_model=TokenResponse)
+async def password_login(
+    body: _LoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
-    """Local-dev fallback. POST {"username":"admin","password":"admin"}
-    returns a JWT for an admin user. Disabled in non-debug builds."""
-    from app.core.config import settings
-    if not settings.DEBUG:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    if body.get("username") != "admin" or body.get("password") != "admin":
+    """Username + password login. Looks up the user by username (case-insensitive),
+    verifies the password against the stored bcrypt hash, returns a JWT."""
+    from passlib.hash import bcrypt
+    uname = (body.username or "").strip().lower()
+    if not uname or not body.password:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    email = "admin@local.dev"
-    stmt = select(User).where(User.email == email)
+    # Match by username (preferred) or email (fallback)
+    stmt = select(User).where(
+        (func.lower(User.username) == uname) | (func.lower(User.email) == uname)
+    )
     user = (await db.execute(stmt)).scalar_one_or_none()
-    if user is None:
-        user = User(
-            email=email,
-            name="admin",
-            role=UserRole.admin,
-            microsoft_id="dev-local-admin",
-        )
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-        logger.info(f"admin-login created admin user id={user.id}")
+    if user is None or not user.password_hash:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    try:
+        if not bcrypt.verify(body.password, user.password_hash):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    user.last_login = datetime.now(timezone.utc)
+    await db.commit()
 
     access_token = create_access_token(
         subject=str(user.id),
