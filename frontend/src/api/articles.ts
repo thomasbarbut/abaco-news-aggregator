@@ -57,6 +57,52 @@ export function useArticle(id: string) {
   });
 }
 
+// ── Feed-side sync (any authenticated user) ───────────────────────────────
+export interface FeedSyncStatus {
+  in_progress: boolean;
+  last_finished_at: number | null; // Unix seconds
+  failed_sources: string[];
+}
+
+export function useFeedSyncStatus() {
+  return useQuery<FeedSyncStatus>({
+    queryKey: ['articles', 'sync-status'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<FeedSyncStatus>('/articles/sync-status');
+      return data;
+    },
+    // While a sync is running we poll faster so the spinner clears promptly.
+    refetchInterval: (query) => (query.state.data?.in_progress ? 3_000 : 30_000),
+    refetchOnWindowFocus: true,
+    staleTime: 5_000,
+  });
+}
+
+export function useFeedTriggerSync() {
+  const queryClient = useQueryClient();
+  return useMutation<{ message: string; in_progress?: boolean }, Error, void>({
+    mutationFn: async () => {
+      const { data } = await apiClient.post<{ message: string; in_progress?: boolean }>(
+        '/articles/sync',
+      );
+      return data;
+    },
+    onSuccess: () => {
+      // Optimistic: mark as in_progress so the spinner shows immediately
+      // without waiting for the next poll tick.
+      queryClient.setQueryData<FeedSyncStatus | undefined>(
+        ['articles', 'sync-status'],
+        (old) =>
+          old
+            ? { ...old, in_progress: true }
+            : { in_progress: true, last_finished_at: null, failed_sources: [] },
+      );
+      // Then re-fetch shortly after to confirm.
+      queryClient.invalidateQueries({ queryKey: ['articles', 'sync-status'] });
+    },
+  });
+}
+
 // ── Mark as read ──────────────────────────────────────────────────────────
 export function useMarkRead() {
   const queryClient = useQueryClient();

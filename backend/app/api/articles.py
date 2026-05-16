@@ -18,6 +18,74 @@ from app.services.article_service import ArticleService
 router = APIRouter(prefix="/articles", tags=["articles"])
 
 
+@router.get("/sync-status")
+async def user_sync_status(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Sync state visible to any authenticated user.
+
+    Returns whether a sync is currently running, when the last one finished,
+    and the names of any sources currently in error state — so the feed can
+    show a refresh button and an error indicator without needing admin rights.
+    """
+    from sqlalchemy import select
+    from app.api.admin import _SYNC_STATE
+    from app.models.news_source import NewsSource, SyncStatus
+
+    failed_rows = (
+        await db.execute(
+            select(NewsSource.name)
+            .where(NewsSource.enabled.is_(True))
+            .where(NewsSource.sync_status == SyncStatus.error)
+            .order_by(NewsSource.name.asc())
+        )
+    ).all()
+
+    return {
+        "in_progress": bool(_SYNC_STATE.get("in_progress", False)),
+        "last_finished_at": _SYNC_STATE.get("last_finished_at"),
+        "failed_sources": [r[0] for r in failed_rows],
+    }
+
+
+@router.post("/sync", status_code=status.HTTP_202_ACCEPTED)
+async def user_trigger_sync(
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Trigger a full sync of all enabled sources (any authenticated user).
+
+    Fire-and-forget: spawns the sync as a background task and returns
+    immediately. Poll /api/articles/sync-status for progress.
+    """
+    import asyncio as _asyncio
+    import time as _time
+    from app.api.admin import _SYNC_STATE
+    from app.tasks.sync_tasks import _sync_all_async
+
+    if _SYNC_STATE.get("in_progress"):
+        return {"message": "Sync already in progress", "in_progress": True}
+
+    async def _runner() -> None:
+        _SYNC_STATE.update({
+            "in_progress": True,
+            "started_at": _time.time(),
+            "source_id": None,
+            "last_result": None,
+        })
+        try:
+            result = await _sync_all_async()
+            _SYNC_STATE["last_result"] = result
+        except Exception as exc:  # noqa: BLE001
+            _SYNC_STATE["last_result"] = {"error": str(exc)}
+        finally:
+            _SYNC_STATE["in_progress"] = False
+            _SYNC_STATE["last_finished_at"] = _time.time()
+
+    _asyncio.create_task(_runner())
+    return {"message": "Sync started", "in_progress": True}
+
+
 @router.get("/unread-counts")
 async def unread_counts(
     date_from: Optional[datetime] = Query(None),

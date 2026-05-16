@@ -1,6 +1,6 @@
-import { useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useArticles } from '@/api/articles';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useArticles, useFeedSyncStatus, useFeedTriggerSync } from '@/api/articles';
 import { useFeedStore } from '@/store/feedStore';
 import ArticleList from '@/components/ArticleList';
 import apiClient from '@/lib/api';
@@ -93,6 +93,27 @@ export default function FeedPage() {
     refetchOnWindowFocus: true,
   });
 
+  // Manual sync + error indicator for the feed. When a running sync
+  // transitions to done, refresh the article list and unread counts so the
+  // new content appears without a manual reload.
+  const queryClient = useQueryClient();
+  const { data: syncStatus } = useFeedSyncStatus();
+  const { mutate: triggerSync } = useFeedTriggerSync();
+  const isSyncing = !!syncStatus?.in_progress;
+  const wasSyncingRef = useRef(false);
+  useEffect(() => {
+    if (wasSyncingRef.current && !isSyncing) {
+      queryClient.invalidateQueries({ queryKey: ['articles', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['articles', 'unread-counts'] });
+    }
+    wasSyncingRef.current = isSyncing;
+  }, [isSyncing, queryClient]);
+  const failed = syncStatus?.failed_sources ?? [];
+  const hasErrors = failed.length > 0;
+  const errorTitle = hasErrors
+    ? `Surse cu erori la ultima sincronizare:\n• ${failed.join('\n• ')}`
+    : '';
+
   return (
     <div className="max-w-3xl mx-auto">
       {/* Tabs: news / newsletter */}
@@ -115,8 +136,43 @@ export default function FeedPage() {
             )}
           </button>
         ))}
-        <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
+        <span className="ml-auto flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
           {!isLoading && data ? `${data.pages[0]?.total.toLocaleString('ro-RO') ?? 0} articole` : ''}
+          {hasErrors && (
+            <span
+              title={errorTitle}
+              aria-label={errorTitle}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-medium"
+            >
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.7-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z" />
+              </svg>
+              {failed.length}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => !isSyncing && triggerSync()}
+            disabled={isSyncing}
+            title={isSyncing ? 'Sincronizare în curs…' : 'Sincronizează sursele'}
+            aria-label="Sincronizează sursele"
+            className={
+              'inline-flex items-center justify-center h-7 w-7 rounded-full transition-colors ' +
+              (isSyncing
+                ? 'text-brand-500 dark:text-brand-400 cursor-wait'
+                : 'text-gray-500 hover:text-brand-600 dark:text-gray-400 dark:hover:text-brand-400 hover:bg-gray-100 dark:hover:bg-gray-800')
+            }
+          >
+            <svg
+              className={'w-4 h-4 ' + (isSyncing ? 'animate-spin' : '')}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v6h6M20 20v-6h-6M20 8a8 8 0 0 0-14.93-2M4 16a8 8 0 0 0 14.93 2" />
+            </svg>
+          </button>
         </span>
       </div>
 
