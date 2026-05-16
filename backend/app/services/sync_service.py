@@ -51,6 +51,18 @@ class SyncService:
                 extra={"source": source.name, "articles_added": count},
             )
 
+            # Newsletter notifications: when new newsletter articles land,
+            # email the ALERT_EMAIL with the titles + links.
+            if count > 0 and any(
+                (a.get("category") == "newsletter") for a in articles
+            ):
+                # Look up which of THIS scrape's articles got inserted (those
+                # whose original_url was not already in DB before this batch).
+                try:
+                    await _notify_newsletter_arrivals(db, source, articles)
+                except Exception as e:
+                    logger.warning(f"Newsletter notification failed: {e}")
+
         except Exception as exc:
             tb = traceback.format_exc()
             log.status = SyncLogStatus.error
@@ -192,3 +204,49 @@ def _get_scraper_for_source(source: NewsSource):  # noqa: ANN201
         rss_url = source.rss_url or source.url  # type: ignore[assignment]
 
     return _FallbackRSS()
+
+
+# ---------------------------------------------------------------------------
+# Newsletter notifications
+# ---------------------------------------------------------------------------
+
+
+async def _notify_newsletter_arrivals(db: AsyncSession, source: NewsSource, scraped: list[dict]) -> None:
+    """Email an alert when newly-inserted newsletter articles arrived.
+
+    Looks at scraped URLs for this run and checks which of them are recent
+    insertions (created in the last 90 seconds) — those are the new ones
+    `save_articles` actually committed."""
+    from datetime import timedelta
+    from sqlalchemy import select as _select
+
+    from app.core.config import settings
+    from app.models.article import Article
+    from app.services.mailer import send_alert
+
+    if not scraped:
+        return
+    urls = [a["original_url"] for a in scraped if a.get("category") == "newsletter"]
+    if not urls:
+        return
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=90)
+    stmt = (
+        _select(Article.title, Article.original_url, Article.created_at)
+        .where(Article.source_id == source.id)
+        .where(Article.original_url.in_(urls))
+        .where(Article.created_at >= cutoff)
+        .order_by(Article.created_at.desc())
+    )
+    rows = (await db.execute(stmt)).all()
+    if not rows:
+        return  # all were duplicates, nothing new
+
+    lines = [
+        f"{len(rows)} newsletter nou la {source.name}",
+        "",
+    ]
+    for title, url, _ts in rows:
+        lines.append(f"• {title}\n  {url}")
+    body = "\n".join(lines)
+    subject = f"[ABACO News] {len(rows)} newsletter nou: {source.name}"
+    await send_alert(settings.ALERT_EMAIL, subject, body)

@@ -58,29 +58,37 @@ export default function FeedPage() {
     );
   }
 
+  // Tabs: All news | Newsletters. Driven by filters.category.
+  const { setFilters } = useFeedStore();
+  const tabs: { id: string; label: string; category: string | undefined }[] = [
+    { id: 'news',       label: 'Știri',       category: undefined  },
+    { id: 'newsletter', label: 'Newsletter',  category: 'newsletter' },
+  ];
+  const activeTabId = filters.category === 'newsletter' ? 'newsletter' : 'news';
+
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Feed stats bar */}
-      {!isLoading && data && (
-        <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-2.5 bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            <span className="font-semibold text-gray-700 dark:text-gray-200">
-              {data.pages[0]?.total.toLocaleString('ro-RO') ?? 0}
-            </span>{' '}
-            articole
-          </span>
-          {filters.search && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              pentru <em>"{filters.search}"</em>
-            </span>
-          )}
-          {filters.category && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 font-medium">
-              {filters.category}
-            </span>
-          )}
-        </div>
-      )}
+      {/* Tabs: news / newsletter */}
+      <div className="sticky top-0 z-10 flex items-center gap-1 px-3 sm:px-5 pt-2 pb-1 bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setFilters({ category: t.category })}
+            className={
+              'h-9 px-4 rounded-t-lg text-sm font-semibold transition-colors border-b-2 -mb-px ' +
+              (activeTabId === t.id
+                ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white/60 dark:bg-gray-900/40'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200')
+            }
+          >
+            {t.label}
+          </button>
+        ))}
+        <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
+          {!isLoading && data ? `${data.pages[0]?.total.toLocaleString('ro-RO') ?? 0} articole` : ''}
+        </span>
+      </div>
 
       <ArticleList
         articles={allArticles}

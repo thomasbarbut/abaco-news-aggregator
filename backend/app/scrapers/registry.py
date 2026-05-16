@@ -8,6 +8,7 @@ from .economedia import EconomiediaScraper
 from .wall_street import WallStreetScraper
 from .forbes import ForbesScraper
 from .avocatnet import AvocatnetScraper
+from .drymix import DrymixNewsletterScraper
 
 SCRAPER_REGISTRY = {
     "ZF - Ziarul Financiar": ZFScraper,
@@ -20,6 +21,7 @@ SCRAPER_REGISTRY = {
     "Wall-Street.ro": WallStreetScraper,
     "Forbes România": ForbesScraper,
     "Avocatnet.ro": AvocatnetScraper,
+    "Drymix Newsletter": DrymixNewsletterScraper,
 }
 
 
