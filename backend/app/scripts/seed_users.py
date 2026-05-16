@@ -8,7 +8,7 @@ updated (so re-running rotates the password to what's in this script).
 """
 import asyncio
 
-from passlib.hash import bcrypt
+import bcrypt
 from sqlalchemy import func, select
 
 from app.core.database import AsyncSessionLocal
@@ -27,7 +27,7 @@ async def seed() -> None:
         for username, email, name, role, password in SEED_USERS:
             stmt = select(User).where(func.lower(User.username) == username.lower())
             existing = (await db.execute(stmt)).scalar_one_or_none()
-            pwd_hash = bcrypt.hash(password)
+            pwd_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("ascii")
             if existing is None:
                 u = User(
                     username=username,

@@ -115,7 +115,7 @@ async def password_login(
 ) -> TokenResponse:
     """Username + password login. Looks up the user by username (case-insensitive),
     verifies the password against the stored bcrypt hash, returns a JWT."""
-    from passlib.hash import bcrypt
+    import bcrypt
     uname = (body.username or "").strip().lower()
     if not uname or not body.password:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -128,9 +128,10 @@ async def password_login(
     if user is None or not user.password_hash:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     try:
-        if not bcrypt.verify(body.password, user.password_hash):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        ok = bcrypt.checkpw(body.password.encode("utf-8"), user.password_hash.encode("ascii"))
     except (ValueError, TypeError):
+        ok = False
+    if not ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     user.last_login = datetime.now(timezone.utc)
