@@ -67,16 +67,20 @@ def sync_single_source(self, source_id: str) -> dict:
 
 
 async def _sync_all_async() -> dict:
-    import uuid as _uuid
+    """Sync every enabled source in its own DB session so a single failure
+    (e.g. UniqueViolationError from one source) can't poison the run for
+    the others. Failure alerts go out via /opt/mail/send_mail.py."""
     from sqlalchemy import select
     from app.core.database import AsyncSessionLocal
+    from app.core.config import settings
     from app.models.news_source import NewsSource
     from app.services.sync_service import SyncService
-    from app.tasks.email_tasks import send_sync_failure_alert
+    from app.services.mailer import send_alert
 
     failed_sources: list[dict] = []
     total = 0
 
+    # 1) List enabled sources (uses one session; read-only, safe)
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(NewsSource).where(NewsSource.enabled.is_(True))
@@ -84,25 +88,50 @@ async def _sync_all_async() -> dict:
         sources = list(result.scalars().all())
         total = len(sources)
 
-        for source in sources:
-            log = await SyncService.sync_source(db, source)
-            if log.error_message:
-                failed_sources.append(
-                    {
-                        "name": source.name,
+    # 2) Sync each source in an isolated session + transaction
+    for source in sources:
+        try:
+            async with AsyncSessionLocal() as db:
+                # Re-attach the source to this session
+                attached = await db.get(NewsSource, source.id)
+                if attached is None:
+                    continue
+                log = await SyncService.sync_source(db, attached)
+                if log.error_message:
+                    failed_sources.append({
+                        "name": attached.name,
                         "error": log.error_message,
-                    }
-                )
-        await db.commit()
+                    })
+                await db.commit()
+        except Exception as exc:
+            import traceback as _tb
+            failed_sources.append({
+                "name": source.name,
+                "error": f"{type(exc).__name__}: {exc}\n{_tb.format_exc()}",
+            })
 
-    # Send alert for failures outside the DB session
-    for failure in failed_sources:
-        send_sync_failure_alert.delay(
-            source_name=failure["name"],
-            error_details=failure["error"],
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            stack_trace=failure["error"],
-        )
+    # 3) Send one consolidated alert if anything failed
+    if failed_sources:
+        try:
+            lines = [
+                f"Failed sources: {len(failed_sources)} of {total}",
+                f"Time: {datetime.now(timezone.utc).isoformat()}",
+                "",
+            ]
+            for f in failed_sources:
+                lines.append(f"=== {f['name']} ===")
+                lines.append(f["error"][:1500])
+                lines.append("")
+            body = "\n".join(lines)
+            subject = (
+                f"[ABACO News] Sync errors: "
+                f"{len(failed_sources)}/{total} sources failed"
+            )
+            await send_alert(settings.ALERT_EMAIL, subject, body)
+        except Exception as e:
+            # Never let mailing break the sync result
+            from app.core.logging import get_logger
+            get_logger(__name__).warning(f"Failure-alert email send failed: {e}")
 
     return {
         "total": total,
@@ -114,9 +143,10 @@ async def _sync_all_async() -> dict:
 async def _sync_single_async(source_id_str: str) -> dict:
     import uuid as _uuid
     from app.core.database import AsyncSessionLocal
+    from app.core.config import settings
     from app.models.news_source import NewsSource
     from app.services.sync_service import SyncService
-    from app.tasks.email_tasks import send_sync_failure_alert
+    from app.services.mailer import send_alert
 
     source_id = _uuid.UUID(source_id_str)
 
@@ -130,12 +160,14 @@ async def _sync_single_async(source_id_str: str) -> dict:
         await db.commit()
 
     if log.error_message:
-        send_sync_failure_alert.delay(
-            source_name=source.name,
-            error_details=log.error_message,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            stack_trace=log.error_message,
-        )
+        try:
+            await send_alert(
+                settings.ALERT_EMAIL,
+                f"[ABACO News] Sync failure: {source.name}",
+                f"Source: {source.name}\nTime: {datetime.now(timezone.utc).isoformat()}\n\n{log.error_message[:3000]}",
+            )
+        except Exception as e:
+            logger.warning(f"Failure-alert email send failed: {e}")
 
     return {
         "source_id": source_id_str,
