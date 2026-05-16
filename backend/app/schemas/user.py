@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict
 
 
 class UserRole(str, enum.Enum):
@@ -16,7 +16,7 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     microsoft_id: str | None = None
     username: str | None = None
-    email: EmailStr
+    email: str
     name: str
     role: UserRole
     created_at: datetime
