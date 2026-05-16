@@ -20,10 +20,16 @@ router = APIRouter(prefix="/articles", tags=["articles"])
 
 @router.get("/unread-counts")
 async def unread_counts(
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Return unread article counts for the current user, bucketed by tab.
+
+    Date filters mirror those of /articles so the counts match what the
+    user actually sees in the feed. Newsletter tab doesn't apply the date
+    filter (newsletters land weekly), so newsletter count ignores it.
 
     Response: {"news": N, "newsletter": M}
     """
@@ -43,6 +49,11 @@ async def unread_counts(
         .where(Article.id.notin_(read_subq))
         .where((Article.category.is_(None)) | (Article.category != "newsletter"))
     )
+    if date_from is not None:
+        news_q = news_q.where(Article.published_at >= date_from)
+    if date_to is not None:
+        news_q = news_q.where(Article.published_at <= date_to)
+
     newsletter_q = (
         select(func.count())
         .select_from(Article)

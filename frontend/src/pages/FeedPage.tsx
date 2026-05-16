@@ -75,11 +75,20 @@ export default function FeedPage() {
   ];
   const activeTabId = filters.category === 'newsletter' ? 'newsletter' : 'news';
 
-  // Per-tab unread counts. Refetched whenever the article list changes
-  // (mark-read mutations invalidate articles list → triggers refetch here too).
+  // Per-tab unread counts. For the Știri count, always apply the default
+  // date_from (yesterday) so the badge matches what the news tab would
+  // show. Newsletter count is unaffected by date (newsletters land weekly).
+  const newsCountDateFrom = activeTabId === 'news' ? (filters.date_from || todayLocal) : todayLocal;
+  const newsCountDateTo = activeTabId === 'news' ? filters.date_to : undefined;
   const { data: unread } = useQuery<{ news: number; newsletter: number }>({
-    queryKey: ['articles', 'unread-counts'],
-    queryFn: async () => (await apiClient.get('/articles/unread-counts')).data,
+    queryKey: ['articles', 'unread-counts', newsCountDateFrom, newsCountDateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (newsCountDateFrom) params.set('date_from', newsCountDateFrom);
+      if (newsCountDateTo)   params.set('date_to',   newsCountDateTo);
+      const qs = params.toString();
+      return (await apiClient.get('/articles/unread-counts' + (qs ? '?' + qs : ''))).data;
+    },
     staleTime: 10_000,
     refetchOnWindowFocus: true,
   });
