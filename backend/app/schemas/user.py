@@ -14,7 +14,8 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    microsoft_id: str
+    microsoft_id: str | None = None
+    username: str | None = None
     email: EmailStr
     name: str
     role: UserRole
