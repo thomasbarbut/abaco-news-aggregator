@@ -62,6 +62,12 @@ class ArticleService:
 
         if filters.category is not None:
             conditions.append(Article.category == filters.category)
+        else:
+            # When no category is requested, exclude "special" buckets
+            # (currently: newsletters). Those are surfaced in their own tab.
+            conditions.append(
+                (Article.category.is_(None)) | (Article.category != "newsletter")
+            )
 
         if filters.search:
             term = f"%{filters.search}%"

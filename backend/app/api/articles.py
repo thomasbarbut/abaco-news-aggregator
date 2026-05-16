@@ -18,6 +18,42 @@ from app.services.article_service import ArticleService
 router = APIRouter(prefix="/articles", tags=["articles"])
 
 
+@router.get("/unread-counts")
+async def unread_counts(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Return unread article counts for the current user, bucketed by tab.
+
+    Response: {"news": N, "newsletter": M}
+    """
+    from sqlalchemy import func, select
+    from app.models.article import Article
+    from app.models.article_read import ArticleRead
+
+    read_subq = (
+        select(ArticleRead.article_id)
+        .where(ArticleRead.user_id == current_user.id)
+        .scalar_subquery()
+    )
+
+    news_q = (
+        select(func.count())
+        .select_from(Article)
+        .where(Article.id.notin_(read_subq))
+        .where((Article.category.is_(None)) | (Article.category != "newsletter"))
+    )
+    newsletter_q = (
+        select(func.count())
+        .select_from(Article)
+        .where(Article.id.notin_(read_subq))
+        .where(Article.category == "newsletter")
+    )
+    news_count = (await db.execute(news_q)).scalar_one()
+    nl_count = (await db.execute(newsletter_q)).scalar_one()
+    return {"news": int(news_count), "newsletter": int(nl_count)}
+
+
 def _build_response(data: dict) -> ArticleResponse:
     """Convert the service-layer dict into an ArticleResponse, embedding source."""
     source_orm = data.pop("source", None)

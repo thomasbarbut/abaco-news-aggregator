@@ -72,6 +72,7 @@ export function useMarkRead() {
       );
       // Invalidate list so read state refreshes
       queryClient.invalidateQueries({ queryKey: articleKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ['articles', 'unread-counts'] });
     },
   });
 }
@@ -89,6 +90,7 @@ export function useMarkUnread() {
         old ? { ...old, is_read: false } : old,
       );
       queryClient.invalidateQueries({ queryKey: articleKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ['articles', 'unread-counts'] });
     },
   });
 }

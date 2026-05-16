@@ -1,7 +1,9 @@
 import { useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useArticles } from '@/api/articles';
 import { useFeedStore } from '@/store/feedStore';
 import ArticleList from '@/components/ArticleList';
+import apiClient from '@/lib/api';
 import type { Article } from '@/types';
 
 export default function FeedPage() {
@@ -73,6 +75,15 @@ export default function FeedPage() {
   ];
   const activeTabId = filters.category === 'newsletter' ? 'newsletter' : 'news';
 
+  // Per-tab unread counts. Refetched whenever the article list changes
+  // (mark-read mutations invalidate articles list → triggers refetch here too).
+  const { data: unread } = useQuery<{ news: number; newsletter: number }>({
+    queryKey: ['articles', 'unread-counts'],
+    queryFn: async () => (await apiClient.get('/articles/unread-counts')).data,
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+  });
+
   return (
     <div className="max-w-3xl mx-auto">
       {/* Tabs: news / newsletter */}
@@ -90,6 +101,9 @@ export default function FeedPage() {
             }
           >
             {t.label}
+            {unread && unread[t.id as 'news' | 'newsletter'] > 0 && (
+              <span className="ml-1.5 text-xs opacity-80">({unread[t.id as 'news' | 'newsletter']})</span>
+            )}
           </button>
         ))}
         <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
