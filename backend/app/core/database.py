@@ -91,3 +91,25 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def ensure_schema_additions() -> None:
+    """Apply additive, idempotent schema fixes that should run on every boot.
+
+    Kept separate from ``init_db`` so it works in production too (where
+    ``init_db`` is skipped). Only safe, IF-NOT-EXISTS-style statements should
+    live here — anything destructive belongs in Alembic.
+    """
+    from sqlalchemy import text as _sa_text
+    from app.core.logging import get_logger as _get_logger
+
+    _log = _get_logger(__name__)
+    _stmts = [
+        "ALTER TABLE articles ADD COLUMN IF NOT EXISTS content_html TEXT",
+    ]
+    async with engine.begin() as conn:
+        for stmt in _stmts:
+            try:
+                await conn.execute(_sa_text(stmt))
+            except Exception as e:  # noqa: BLE001
+                _log.warning(f"schema addition skipped ({stmt!r}): {e}")

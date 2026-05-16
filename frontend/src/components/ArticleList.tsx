@@ -1,9 +1,10 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import type { Article } from '@/types';
 import ArticleCard from './ArticleCard';
 import ArticleCardSkeleton from './ArticleCardSkeleton';
+import ArticleArchiveModal from './ArticleArchiveModal';
 import { Loader2 } from 'lucide-react';
 
 interface ArticleGroup {
@@ -56,6 +57,7 @@ export default function ArticleList({
   onLoadMore,
 }: ArticleListProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const [archiveArticleId, setArchiveArticleId] = useState<string | null>(null);
 
   // IntersectionObserver for infinite scroll
   const observerCallback = useCallback(
@@ -136,10 +138,22 @@ export default function ArticleList({
 
           {groupArticles.map((article) => {
             const idx = globalIndex++;
-            return <ArticleCard key={article.id} article={article} index={idx} />;
+            return (
+              <ArticleCard
+                key={article.id}
+                article={article}
+                index={idx}
+                onOpenArchive={setArchiveArticleId}
+              />
+            );
           })}
         </section>
       ))}
+
+      <ArticleArchiveModal
+        articleId={archiveArticleId}
+        onClose={() => setArchiveArticleId(null)}
+      />
 
       {/* Infinite scroll sentinel */}
       <div ref={sentinelRef} className="h-4" />

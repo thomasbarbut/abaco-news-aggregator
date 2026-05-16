@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.database import init_db
+from app.core.database import ensure_schema_additions, init_db
 from app.core.logging import get_logger, setup_logging
 
 
@@ -33,6 +33,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if settings.DEBUG:
         # In development we create tables directly; in production Alembic handles this
         await init_db()
+    # Apply additive schema fixes on every boot (safe in prod too).
+    await ensure_schema_additions()
 
     # Background auto-sync loop. Runs in-process when no Celery worker/beat is
     # available (eager mode). When CELERY_TASK_ALWAYS_EAGER=true (or DEBUG=true)

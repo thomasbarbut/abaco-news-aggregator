@@ -16,6 +16,7 @@ feedparser==6.0.11
 beautifulsoup4==4.12.3
 playwright==1.49.0
 newspaper3k==0.2.8
+trafilatura==1.12.2
 lxml==5.3.0
 python-multipart==0.0.12
 email-validator==2.2.0

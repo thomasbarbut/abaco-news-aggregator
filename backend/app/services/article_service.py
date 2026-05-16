@@ -5,6 +5,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+import asyncio
+
 from sqlalchemy import func, select, and_, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +15,7 @@ from app.models.article import Article
 from app.models.article_read import ArticleRead
 from app.models.news_source import NewsSource
 from app.schemas.article import ArticleFilter
+from app.services.content_extractor import fetch_and_extract
 
 logger = get_logger(__name__)
 
@@ -265,6 +268,7 @@ class ArticleService:
         seen_urls: set[str] = set()
         # Seed the slug-collision tracker with what's already in the DB.
         seen_slugs: set[str] = set(existing_slugs)
+        new_articles: list[Article] = []
 
         for article_data in articles:
             checksum = article_data["checksum"]
@@ -295,9 +299,15 @@ class ArticleService:
                 checksum=checksum,
             )
             db.add(article)
+            new_articles.append(article)
             seen_checksums.add(checksum)
             seen_urls.add(url)
             saved += 1
+
+        # Enrich newly-inserted articles with their full body (text + HTML)
+        # before flushing. Best-effort: failures leave content fields NULL.
+        if new_articles:
+            await ArticleService._enrich_with_content(new_articles)
 
         if saved:
             await db.flush()
@@ -306,6 +316,37 @@ class ArticleService:
             extra={"source_id": str(source_id), "count": saved},
         )
         return saved
+
+
+    # ------------------------------------------------------------------
+    # Content enrichment
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def _enrich_with_content(articles: list[Article]) -> None:
+        """Populate content + content_html for a batch of fresh articles.
+
+        Bounded concurrency (max 3 parallel fetches) to be polite to sources.
+        Failures are swallowed — content fields just stay NULL.
+        """
+        sem = asyncio.Semaphore(3)
+
+        async def _enrich(a: Article) -> None:
+            async with sem:
+                try:
+                    text, html = await fetch_and_extract(a.original_url)
+                except Exception as exc:  # noqa: BLE001
+                    logger.info(
+                        "content enrich failed",
+                        extra={"url": a.original_url, "error": str(exc)},
+                    )
+                    return
+                if text and not a.content:
+                    a.content = text
+                if html:
+                    a.content_html = html
+
+        await asyncio.gather(*[_enrich(a) for a in articles], return_exceptions=True)
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +362,7 @@ def _article_to_dict(article: Article) -> dict[str, Any]:
         "slug": article.slug,
         "summary": article.summary,
         "content": article.content,
+        "content_html": article.content_html,
         "original_url": article.original_url,
         "image_url": article.image_url,
         "author": article.author,

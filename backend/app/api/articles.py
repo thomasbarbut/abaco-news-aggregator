@@ -11,7 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.auth.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.article import ArticleFilter, ArticleListResponse, ArticleResponse
+from app.schemas.article import (
+    ArticleFilter,
+    ArticleListItem,
+    ArticleListResponse,
+    ArticleResponse,
+)
 from app.schemas.source import NewsSourceResponse
 from app.services.article_service import ArticleService
 
@@ -145,6 +150,22 @@ def _build_response(data: dict) -> ArticleResponse:
     return resp
 
 
+def _build_list_item(data: dict) -> ArticleListItem:
+    """Build a compact list-item from the service dict.
+
+    Drops the heavy body fields and replaces them with a single ``has_archive``
+    boolean so the UI can decide whether to offer a 'view archive' action.
+    """
+    source_orm = data.pop("source", None)
+    has_archive = bool(data.get("content") or data.get("content_html"))
+    # Strip the heavy fields before model construction
+    light = {k: v for k, v in data.items() if k not in ("content", "content_html")}
+    item = ArticleListItem(**light, has_archive=has_archive)
+    if source_orm is not None:
+        item.source = NewsSourceResponse.model_validate(source_orm)
+    return item
+
+
 @router.get("", response_model=ArticleListResponse)
 async def list_articles(
     source_ids: Optional[list[uuid.UUID]] = Query(None),
@@ -175,7 +196,7 @@ async def list_articles(
     )
 
     items_raw, total = await ArticleService.get_articles(db, filters, current_user.id)
-    items = [_build_response(d) for d in items_raw]
+    items = [_build_list_item(d) for d in items_raw]
 
     return ArticleListResponse(
         items=items,

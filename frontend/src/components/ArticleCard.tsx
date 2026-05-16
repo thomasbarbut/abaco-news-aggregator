@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { ro } from 'date-fns/locale';
-import { ExternalLink, BookOpen, Check } from 'lucide-react';
+import { ExternalLink, BookOpen, Check, Archive } from 'lucide-react';
 import type { Article } from '@/types';
 import SourceBadge from './SourceBadge';
 import { useMarkRead } from '@/api/articles';
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 interface ArticleCardProps {
   article: Article;
   index?: number;
+  onOpenArchive?: (id: string) => void;
 }
 
 function RelativeTime({ dateStr }: { dateStr: string }) {
@@ -30,8 +31,16 @@ function RelativeTime({ dateStr }: { dateStr: string }) {
   }
 }
 
-export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
+export default function ArticleCard({ article, index = 0, onOpenArchive }: ArticleCardProps) {
   const { mutate: markRead } = useMarkRead();
+
+  const handleOpenArchive = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onOpenArchive?.(article.id);
+    },
+    [article.id, onOpenArchive],
+  );
 
   // Click anywhere on the card: open the source article in a new tab AND
   // mark it as read locally. We skip the in-app /article/:id detail view —
@@ -158,6 +167,24 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
             <ExternalLink className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Original</span>
           </a>
+
+          {article.has_archive && (
+            <button
+              type="button"
+              onClick={handleOpenArchive}
+              title="Vezi versiunea arhivată"
+              aria-label="Vezi versiunea arhivată"
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium',
+                'text-gray-500 dark:text-gray-400',
+                'hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-900/20 dark:hover:text-brand-400',
+                'transition-colors',
+              )}
+            >
+              <Archive className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Arhivă</span>
+            </button>
+          )}
 
           {!article.is_read && (
             <button

@@ -22,7 +22,12 @@ export interface Article {
   title: string;
   slug: string;
   summary: string | null;
-  content: string | null;
+  // Full body is returned only on the detail endpoint; list responses omit it
+  // and surface `has_archive` instead so the UI can show a "view archive" CTA
+  // without dragging tens of KB of HTML through every list payload.
+  content?: string | null;
+  content_html?: string | null;
+  has_archive?: boolean;
   original_url: string;
   image_url: string | null;
   author: string | null;

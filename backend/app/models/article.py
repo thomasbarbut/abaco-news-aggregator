@@ -28,6 +28,10 @@ class Article(Base):
     slug: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     content: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    # Extracted body of the article in HTML form (links + headings preserved).
+    # Populated post-fetch by trafilatura when the source page is reachable;
+    # used as the "archived" version displayed in-app.
+    content_html: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     original_url: Mapped[str] = mapped_column(String(2048), unique=True, nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True, default=None)
     author: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
