@@ -223,6 +223,7 @@ class ArticleService:
 
         checksums = [a["checksum"] for a in articles]
         urls = [a["original_url"] for a in articles]
+        candidate_slugs = [a.get("slug", "untitled") for a in articles]
 
         existing_checksums: set[str] = {
             row[0]
@@ -240,10 +241,24 @@ class ArticleService:
                 )
             ).all()
         }
+        # Load existing slugs that collide with our candidates so _unique_slug
+        # can avoid them. Without this, an article whose checksum changed
+        # (re-edited at the source) but whose title stayed the same would crash
+        # the whole transaction with articles_slug_key.
+        existing_slugs: set[str] = {
+            row[0]
+            for row in (
+                await db.execute(
+                    select(Article.slug).where(Article.slug.in_(candidate_slugs))
+                )
+            ).all()
+        }
 
         saved = 0
         seen_checksums: set[str] = set()
         seen_urls: set[str] = set()
+        # Seed the slug-collision tracker with what's already in the DB.
+        seen_slugs: set[str] = set(existing_slugs)
 
         for article_data in articles:
             checksum = article_data["checksum"]
@@ -254,9 +269,9 @@ class ArticleService:
             if url in existing_urls or url in seen_urls:
                 continue
 
-            # Ensure slug uniqueness within this batch by appending a suffix
+            # Ensure slug uniqueness against this batch AND the DB.
             base_slug: str = article_data.get("slug", "untitled")
-            slug = _unique_slug(base_slug, seen_checksums)
+            slug = _unique_slug(base_slug, seen_slugs)
 
             article = Article(
                 source_id=source_id,

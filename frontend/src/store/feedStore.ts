@@ -14,23 +14,27 @@ interface FeedState {
   toggleDarkMode: () => void;
 }
 
-// Today as YYYY-MM-DD in the user's local timezone.
-function todayLocalDate(): string {
-  const d = new Date();
+// YYYY-MM-DD in the user's local timezone for a given Date.
+function localDate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
-// Computed lazily on each store init so "today" is actually today,
-// not the date the bundle was built.
+// Computed lazily on each store init so the date is actually current.
+// We use "since yesterday" (last ~24-48h) as the default rather than
+// strict today, because early in a new day sources may not have
+// published anything yet and a strict today filter shows an empty feed.
+// The "Astăzi" preset in FilterSidebar still gives a strict today-only view.
 function defaultFilters(): ArticleFilter {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
   return {
     page: 1,
     page_size: 20,
-    is_read: false,        // hide read articles
-    date_from: todayLocalDate(),  // only today by default
+    is_read: false,         // hide read articles
+    date_from: localDate(yesterday),
   };
 }
 
